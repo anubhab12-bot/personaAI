@@ -91,7 +91,7 @@ class ChatService:
         """Handle company-related queries"""
         try:
             # Get company-specific context
-            context = self.personal_kb.get_relevant_context(query, top_k=5)
+            context = self.personal_kb.get_relevant_context("company", top_k=5)
             
             # Format the prompt
             formatted_prompt = self.format_template(
@@ -107,7 +107,7 @@ class ChatService:
                 messages=self.messages,
                 model=GROQ_MODEL,
             )
-            
+
             response_text = chat_response.choices[0].message.content
             
             # Attempt to parse the JSON response
@@ -150,6 +150,18 @@ class ChatService:
                 "links": []
             }
         return error_response, 0
+    
+    def handle_identity_query(self, query: str):
+        """Handle identity-related queries"""
+        context = self.personal_kb.get_relevant_context(query, top_k=5)
+        
+        formatted_prompt = self.format_template(
+            IDENTITY_QUERY_TEMPLATE,
+            personal_context=context,
+            query=query
+        )
+        
+        return self._get_chat_response(formatted_prompt)
 
     def handle_identity_query(self, query: str):
         """Handle identity-related queries"""

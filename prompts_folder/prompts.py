@@ -17,13 +17,8 @@ The user is asking: {query}
 
 Please provide a comprehensive response about their company, including relevant details from the context. 
 Ensure to mention their role and company name in the response. 
-Format the response in JSON as follows:
-{
-    "response": "Your AI-generated response about the company",
-    "links": [
-        {"title": "Company Website", "url": "https://example.com"}
-    ]
-}
+In response, you should return a link with a proper title.
+
 ONLY return the JSON response. No additional text.
 """
 
@@ -40,6 +35,8 @@ IDENTITY_QUERY_TEMPLATE = """
         4. Includes any other relevant personal details
 
         Format the response in a natural, conversational way while maintaining the required JSON structure.
+
+        If the user is asking about both their company and identity, you should return a link of their company with a proper title.
 """
 
 # System message template
