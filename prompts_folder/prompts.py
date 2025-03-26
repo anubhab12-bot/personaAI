@@ -67,6 +67,8 @@ GENERAL_QUERY_TEMPLATE = """
 Context about the user that might be relevant:
 {personal_context}
 
+it is less important to response with their any personal information except their name.
+
 User query: {query}
 
 Please provide a response, incorporating personal context when relevant.
