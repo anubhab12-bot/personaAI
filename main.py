@@ -1,5 +1,7 @@
 import time
 import json
+import os
+import traceback
 from prompts_folder.prompts import *
 from service.settings import (
     MAX_REQUESTS_PER_DAY, 
@@ -8,8 +10,6 @@ from service.settings import (
 )
 from service.personal_knowledge import PersonalKnowledgeBase
 from service.chat_service import ChatService
-
-json_file = 'jason_data/personal_data.json'
 
 def read_personal_data():
     """Read personal data from JSON file"""
@@ -25,62 +25,91 @@ def read_personal_data():
 
 def chatbot():
     """Main chatbot function."""
-    # print(WELCOME_TEMPLATE)
+    print("Initializing chatbot with LangChain and Hugging Face embeddings...")
     
-    # Initialize components
-    personal_kb = PersonalKnowledgeBase()
-    personal_data = read_personal_data()
-    personal_kb.add_personal_data(personal_data)
-    chat_service = ChatService(personal_kb)
-    print("Personal knowledge base initialized")
-    # Initialize tracking variables
-    total_requests = 0
-    total_used_tokens = 0
-    minute_start_time = time.time()
-    tokens_used_in_minute = 0
+    # Create data directory for saving learned examples
+    os.makedirs("data", exist_ok=True)
+    
+    try:
+        # Initialize components
+        personal_kb = PersonalKnowledgeBase()
+        personal_data = read_personal_data()
+        personal_kb.add_personal_data(personal_data)
+        
+        chat_service = ChatService(personal_kb)
+        print("Personal knowledge base initialized")
+        
+        # Initialize tracking variables
+        total_requests = 0
+        total_used_tokens = 0
+        minute_start_time = time.time()
+        tokens_used_in_minute = 0
 
-    while True:
-        # print(json_file)
-        user_query = input("\nAsk me anything (or type 'quit' to quit): ")
+        while True:
+            user_query = input("\nAsk me anything (or type 'quit' to quit): ")
 
-        if user_query.lower() == "quit":
-            print("\nGoodbye!")
-            break
+            if user_query.lower() == "quit":
+                print("\nSaving learned data and exiting...")
+                chat_service.save_intent_examples()
+                print("Goodbye!")
+                break
 
+            # Check limits
+            if total_requests >= MAX_REQUESTS_PER_DAY:
+                print("Daily request limit reached. Try again tomorrow.")
+                break
+            if total_used_tokens >= MAX_TOKENS_PER_DAY:
+                print("Daily token limit reached. Try again tomorrow.")
+                break
 
-        if total_requests >= MAX_REQUESTS_PER_DAY:
-            print("Daily request limit reached. Try again tomorrow.")
-            break
-        if total_used_tokens >= MAX_TOKENS_PER_DAY:
-            print("Daily token limit reached. Try again tomorrow.")
-            break
+            # Reset minute counters if needed
+            if time.time() - minute_start_time >= 60:
+                tokens_used_in_minute = 0
+                minute_start_time = time.time()
 
-        if time.time() - minute_start_time >= 60:
-            tokens_used_in_minute = 0
-            minute_start_time = time.time()
+            # Check minute rate limit
+            if tokens_used_in_minute >= MAX_TOKENS_PER_MINUTE:
+                print("Token limit per minute reached. Waiting before next request...")
+                time.sleep(60 - (time.time() - minute_start_time))
+                tokens_used_in_minute = 0
 
-        if tokens_used_in_minute >= MAX_TOKENS_PER_MINUTE:
-            print("Token limit per minute reached. Waiting before next request...")
-            time.sleep(60 - (time.time() - minute_start_time))
-            tokens_used_in_minute = 0
+            # Get response
+            response_data, used_tokens = chat_service.chat(user_query)
 
-        response_data, used_tokens = chat_service.chat(user_query)
+            # Update usage tracking
+            total_requests += 1
+            total_used_tokens += used_tokens
+            tokens_used_in_minute += used_tokens
 
-        total_requests += 1
-        total_used_tokens += used_tokens
-        tokens_used_in_minute += used_tokens
+            # Print Response - UPDATED FOR CLEANER DISPLAY
+            print("\nPersonaAI:")
+            print(response_data["response"])
 
-        # Print Response
-        print("\nAI Response:")
-        print(response_data["response"])
+            # Only print links if they exist and aren't empty
+            if response_data.get("links") and len(response_data["links"]) > 0:
+                print("\nRelevant Links:")
+                for link in response_data["links"]:
+                    if "title" in link and "url" in link:
+                        print(f"• {link['title']}: {link['url']}")
+                    elif "url" in link:
+                        print(f"• {link['url']}")
 
-        print("\nRelevant Links:")
-        for link in response_data["links"]:
-            print(f"{link['title']}: {link['url']}")
-
-        print(f"\nTokens Used: {used_tokens}")
-        print(f"Remaining Tokens Today: {MAX_TOKENS_PER_DAY - total_used_tokens}")
-        print(f"Remaining Requests Today: {MAX_REQUESTS_PER_DAY - total_requests}")
+            # Print usage stats in a more subtle way
+            print(f"\n[Tokens: {used_tokens} | Remaining: {MAX_TOKENS_PER_DAY - total_used_tokens}]")
+            
+    except KeyboardInterrupt:
+        print("\nProgram interrupted. Saving learned data...")
+        chat_service.save_intent_examples()
+        print("Goodbye!")
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
+        print(traceback.format_exc())
+        print("Attempting to save learned data before exiting...")
+        try:
+            chat_service.save_intent_examples()
+            print("Learned data saved successfully.")
+        except:
+            print("Could not save learned data.")
 
 if __name__ == "__main__":
     chatbot()
