@@ -54,6 +54,7 @@ class ChatService:
             model_name=GROQ_MODEL
         )
         
+        self.max_tokens_per_query = 150
         self.personal_kb = personal_kb
         
         # Initialize LangChain HuggingFace embeddings with a strong model
@@ -81,7 +82,11 @@ class ChatService:
         # Initialize tracking for dynamic learning
         self.intent_examples, self.intent_centroids = self._initialize_intent_examples()
         self.classified_queries = {intent: [] for intent in QueryIntent}
-
+    def count_tokens(self, text: str) -> int:
+        """Count the number of tokens in a given text"""
+        # Simple tokenization by splitting on whitespace
+        return len(text.split())
+    
     def _initialize_vector_stores(self):
         """Initialize different vector stores for different types of knowledge"""
         documents = self._prepare_documents_from_kb()

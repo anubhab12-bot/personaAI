@@ -48,13 +48,23 @@ def chatbot():
         while True:
             user_query = input("\nAsk me anything (or type 'quit' to quit): ")
 
+            token_count = chat_service.count_tokens(user_query)
+
+            if token_count > chat_service.max_tokens_per_query:
+                response = {
+                    "response": f"Your query is too long. Please limit your input to {chat_service.max_tokens_per_query} tokens.",
+                    "links": []
+                }
+                return response, 0
+                
+
             topic = chat_service.detect_topic(user_query)
             chat_service.topics.append(topic)
 
             intent = chat_service.detect_intent(user_query)
             chat_service.intents.append(intent)
 
-            if user_query.lower() == "quit":
+            if user_query.lower() == "Bye":
                 print("\nSaving learned data and exiting...")
                 chat_service.save_intent_examples()
                 chat_service.save_conversation_history()
