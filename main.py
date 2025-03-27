@@ -48,9 +48,16 @@ def chatbot():
         while True:
             user_query = input("\nAsk me anything (or type 'quit' to quit): ")
 
+            topic = chat_service.detect_topic(user_query)
+            chat_service.topics.append(topic)
+
+            intent = chat_service.detect_intent(user_query)
+            chat_service.intents.append(intent)
+
             if user_query.lower() == "quit":
                 print("\nSaving learned data and exiting...")
                 chat_service.save_intent_examples()
+                chat_service.save_conversation_history()
                 print("Goodbye!")
                 break
 
@@ -62,30 +69,24 @@ def chatbot():
                 print("Daily token limit reached. Try again tomorrow.")
                 break
 
-            # Reset minute counters if needed
             if time.time() - minute_start_time >= 60:
                 tokens_used_in_minute = 0
                 minute_start_time = time.time()
 
-            # Check minute rate limit
             if tokens_used_in_minute >= MAX_TOKENS_PER_MINUTE:
                 print("Token limit per minute reached. Waiting before next request...")
                 time.sleep(60 - (time.time() - minute_start_time))
                 tokens_used_in_minute = 0
 
-            # Get response
             response_data, used_tokens = chat_service.chat(user_query)
 
-            # Update usage tracking
             total_requests += 1
             total_used_tokens += used_tokens
             tokens_used_in_minute += used_tokens
 
-            # Print Response - UPDATED FOR CLEANER DISPLAY
             print("\nPersonaAI:")
             print(response_data["response"])
 
-            # Only print links if they exist and aren't empty
             if response_data.get("links") and len(response_data["links"]) > 0:
                 print("\nRelevant Links:")
                 for link in response_data["links"]:

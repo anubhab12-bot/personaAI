@@ -9,6 +9,7 @@ from .settings import GROQ_API_KEY, GROQ_MODEL
 from .personal_knowledge import PersonalKnowledgeBase
 from prompts_folder.prompts import *
 from .utils import fetch_duckduckgo_links
+from collections import Counter
 
 # LangChain imports
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -62,6 +63,8 @@ class ChatService:
             encode_kwargs={'normalize_embeddings': True}  # Normalize for better matching
         )
         
+        self.topics = []
+        self.intents = []
         # Initialize various LangChain components
         self._initialize_vector_stores()
         self._initialize_retrievers()
@@ -680,6 +683,48 @@ class ChatService:
         except Exception as e:
             print(f"Error retrieving context: {e}")
             return "No relevant context found."
+    
+    def detect_topic(self, query: str) -> str:
+        """Detect the topic of a query using a language model"""
+        topic_prompt = f"""
+        You are a topic classifier. Determine the main topic of the following query:
+        
+        Query: {query}
+        
+        Provide a single word or short phrase that best describes the topic.
+        """
+        
+        try:
+            # Use the LLM to determine the topic
+            response = self.llm.invoke([{"role": "system", "content": topic_prompt}])
+            topic = response.content.strip().lower()
+            return topic
+        except Exception as e:
+            print(f"Error detecting topic: {e}")
+            return "general"
+        
+    def save_conversation_history(self):
+        """Save the conversation history to a text file"""
+        if self.topics:
+            topic_counter = Counter(self.topics)
+            dominant_topic = topic_counter.most_common(1)[0][0]
+        else:
+            dominant_topic = "general"
+
+        logs_dir = os.path.join(os.getcwd(), "conversation_logs")
+        os.makedirs(logs_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"conversation_{dominant_topic}_{timestamp}.txt"
+        filepath = os.path.join(logs_dir, filename)
+
+        # Write the conversation history to the file
+        with open(filepath, "w") as file:
+            for message in self.chat_history:
+                role = "User" if isinstance(message, HumanMessage) else "AI"
+                file.write(f"{role}: {message.content}\n")
+
+        print(f"Conversation history saved to {filepath}")
 
     def chat(self, query: str) -> Tuple[Dict[str, Any], int]:
         """Main chat function with intent-based routing and specialized handling"""

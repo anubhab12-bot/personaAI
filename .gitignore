@@ -1,5 +1,5 @@
 .qodo
-
+.config.py
 ai_env/
 */__pycache__/
 */__pycache__/*
@@ -9,4 +9,5 @@ ai_env/
 *.pyw
 *.pyz
 *.pywz
-*.pyzw
+*.pyzw\
+.env

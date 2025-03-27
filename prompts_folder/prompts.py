@@ -214,10 +214,10 @@ End with a subtle invitation to continue the conversation or a thoughtful follow
 {custom_few_shot}
 
 Format your response as valid JSON with the following structure:
-{{
+{
   "response": "Your warm, personalized, human-like response here",
   "links": []
-}}
+}
 """
 
 # Template for general queries
