@@ -3,6 +3,7 @@ import json
 import os
 import traceback
 from prompts_folder.prompts import *
+from service.send_mail import is_valid_email, send_email
 from service.settings import (
     MAX_REQUESTS_PER_DAY, 
     MAX_TOKENS_PER_DAY, 
@@ -10,6 +11,7 @@ from service.settings import (
 )
 from service.personal_knowledge import PersonalKnowledgeBase
 from service.chat_service import ChatService
+from service.tts import TextToSpeech
 
 def read_personal_data():
     """Read personal data from JSON file"""
@@ -39,11 +41,15 @@ def chatbot():
         chat_service = ChatService(personal_kb)
         print("Personal knowledge base initialized")
         
+        tts = TextToSpeech()
+        
         # Initialize tracking variables
         total_requests = 0
         total_used_tokens = 0
         minute_start_time = time.time()
         tokens_used_in_minute = 0
+
+        last_response_text = ""
 
         while True:
             user_query = input("\nAsk me anything (or type 'quit' to quit): ")
@@ -71,7 +77,30 @@ def chatbot():
                 print("Goodbye!")
                 break
 
-            # Check limits
+            if "voice" in user_query.lower():
+                user_query = input("\n Do you want 'female' or 'male' voice :")
+                if "female" in user_query.lower():
+                    if last_response_text:  # Check if there is a last response to speak
+                        tts.speak_female(last_response_text)  # Convert last response to speech
+                elif "male" in user_query.lower():
+                    if last_response_text:  # Check if there is a last response to speak
+                        tts.speak_male(last_response_text)
+                else:
+                    print("No previous response to convert to voice.")
+                continue  # Skip the rest of the loop
+            
+
+            if "send" and "email" in user_query.lower():
+                user_query = input("\n Do you want to send a mail ?")
+                if "yes" in user_query.lower():
+                        recipient_email = input("\nPlease add the email of the person: ")
+                        if not is_valid_email(recipient_email):
+                            return "Error: The email address provided is not valid. Please enter a valid email address."
+                        subject = input("\nEnter the subject of the email: ")
+                        body = last_response_text
+                        send_email( subject, body, recipient_email)
+                        continue 
+                
             if total_requests >= MAX_REQUESTS_PER_DAY:
                 print("Daily request limit reached. Try again tomorrow.")
                 break
@@ -89,13 +118,20 @@ def chatbot():
                 tokens_used_in_minute = 0
 
             response_data, used_tokens = chat_service.chat(user_query)
+            response_data["Tasks_doc"] = chat_service.save_topic_wise_conversation_history()
+            last_response_text = response_data["response"]
+            print(last_response_text)
 
             total_requests += 1
             total_used_tokens += used_tokens
             tokens_used_in_minute += used_tokens
 
             print("\nPersonaAI:")
-            print(response_data["response"])
+            print("Response : ", response_data["response"])
+            print("----------------------------------------------------------")
+            print("File path : ", response_data["Tasks_doc"])
+
+
 
             if response_data.get("links") and len(response_data["links"]) > 0:
                 print("\nRelevant Links:")

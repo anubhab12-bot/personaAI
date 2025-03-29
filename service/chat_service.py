@@ -6,6 +6,7 @@ import os
 import pickle
 from groq import Groq
 from typing import Dict, List, Tuple, Any, Optional
+from fpdf import FPDF
 
 import requests
 from .settings import GROQ_API_KEY, GROQ_MODEL
@@ -771,9 +772,30 @@ class ChatService:
         except Exception as e:
             print(f"Error detecting topic: {e}")
             return "general"
-        
+    def save_topic_wise_conversation_history(self):
+        """Save only AI responses from the conversation history to a text file"""
+        if self.topics:
+            topic_counter = Counter(self.topics)
+            dominant_topic = topic_counter.most_common(1)[0][0]
+        else:
+            dominant_topic = "general"
+
+        logs_dir = os.path.join(os.getcwd(), "task_logs")
+        os.makedirs(logs_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"conversation_{dominant_topic}_{timestamp}.txt"
+        filepath = os.path.join(logs_dir, filename)
+
+        with open(filepath, "w", encoding='utf-8') as file:
+            for message in self.chat_history:
+                if not isinstance(message, HumanMessage):  
+                    file.write(f"{message.content}\n")
+        return filename
+        print(f"Conversation history saved to {filepath}")   
+         
     def save_conversation_history(self):
-        """Save the conversation history to a text file"""
+        """Save only AI responses from the conversation history to a text file"""
         if self.topics:
             topic_counter = Counter(self.topics)
             dominant_topic = topic_counter.most_common(1)[0][0]
@@ -787,13 +809,30 @@ class ChatService:
         filename = f"conversation_{dominant_topic}_{timestamp}.txt"
         filepath = os.path.join(logs_dir, filename)
 
-        # Write the conversation history to the file with utf-8 encoding
         with open(filepath, "w", encoding='utf-8') as file:
             for message in self.chat_history:
-                role = "User" if isinstance(message, HumanMessage) else "AI"
-                file.write(f"{role}: {message.content}\n")
+                if not isinstance(message, HumanMessage):  # Store only AI responses
+                    file.write(f"{message.content}\n")
 
         print(f"Conversation history saved to {filepath}")
+
+    def detect_voice_request(self, query: str) -> bool:
+        """Determine if the user wants a voice response."""
+        voice_request_prompt = f"""
+        You are an intent classifier. Determine if the following query indicates that the user wants a voice response:
+        
+        Query: "{query}"
+        
+        Respond with "yes" if it is a voice request, or "no" if it is not.
+        """
+        
+        try:
+            response = self.llm.invoke([{"role": "system", "content": voice_request_prompt}])
+            response = response.lower().strip()
+            return response == "yes"
+        except Exception as e:
+            print(f"Error in voice request classification: {e}")
+            return False
 
     def chat(self, query: str) -> Tuple[Dict[str, Any], int]:
         """Main chat function with intent-based routing and specialized handling"""
@@ -945,6 +984,10 @@ class ChatService:
             self.chat_history.append(AIMessage(content=response_text))
             tokens = len(query.split()) + len(response_text.split()) * 1.5
             return response, int(tokens)
+
+        if self.detect_voice_request(query):
+            response_text = self._generate_response(query)  # Generate the response
+            return {"response": response_text, "voice": True}, 0 
         
         if intent == QueryIntent.COMPANY:
             return self.handle_company_query(query)
