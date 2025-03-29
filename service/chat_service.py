@@ -1,10 +1,13 @@
 from enum import Enum
 import json
+from bs4 import BeautifulSoup
 import numpy as np
 import os
 import pickle
 from groq import Groq
 from typing import Dict, List, Tuple, Any, Optional
+
+import requests
 from .settings import GROQ_API_KEY, GROQ_MODEL
 from .personal_knowledge import PersonalKnowledgeBase
 from prompts_folder.prompts import *
@@ -545,11 +548,60 @@ class ChatService:
                 "links": []
             }
             return error_response, 0
+        
+    def _generate_detailed_plan(self, query: str) -> str:
+        """Generate a detailed plan based on the user's query for various topics in a mentor-like manner"""
+        prompt = f"""
+        You are a knowledgeable mentor. The user has expressed interest in the following: "{query}".
+        Please provide a comprehensive and supportive response outlining the steps they should take to accomplish this task, including:
+        - Suggested start date or timeline
+        - Estimated costs or resources needed
+        - Key activities or steps to take
+        - Tips and insights to help the user succeed
+        - Any other relevant information to help the user achieve their goal.
+        
+        Make sure to encourage the user and provide a positive outlook on their journey.
+        """
+        
+        # Invoke the language model with the prompt
+        response = self.llm.invoke([{"role": "system", "content": prompt}])
+        return response.content.strip()
     
+    def perform_web_search(self, query: str) -> List[str]:
+        """Perform a web search and return the results using web scraping."""
+        search_url = f"https://www.duckduckgo.com/?q={query.replace(' ', '+')}&t=h_&ia=web"
+        print(search_url)
+        try:
+            response = requests.get(search_url)
+            response.raise_for_status()  # Raise an error for bad responses
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Extract search results
+            results = []
+            for result in soup.find_all('a', class_='result__a'):
+                title = result.get_text()
+                link = result['href']
+                results.append(f"{title}: {link}")
+
+            return results[:5]  # Return the top 5 results
+        except Exception as e:
+            print(f"Error performing web search: {e}")
+            return []
+
+    def summarize_web_results(self, results: List[str]) -> str:
+        """Summarize the web search results into a coherent response."""
+        if not results:
+            return "I couldn't find any relevant information from the web."
+
+        # Here, we can use the AI to summarize the results
+        summary = " ".join(results)  # Simple concatenation for demonstration
+        return f"Here is what I found: {summary}"
+    
+
     def handle_general_query(self, query: str) -> Tuple[Dict[str, Any], int]:
         """Handle general queries with improved context retrieval and response generation"""
         try:
-            # Check if it's a question about PersonaAI first
+
             from prompts_folder.prompts import is_assistant_identity_question
             if is_assistant_identity_question(query):
                 # Return identity response instead
@@ -568,12 +620,10 @@ class ChatService:
             # Enhanced context retrieval using multiple strategies
             basic_context = self.get_relevant_context(query, top_k=3)
             
-            # Try to get additional context with the multi-query retriever if available
             try:
                 if hasattr(self, 'multi_query_retriever') and self.multi_query_retriever:
                     enhanced_docs = self.multi_query_retriever.get_relevant_documents(query)
                     enhanced_context = "\n\n".join([doc.page_content for doc in enhanced_docs])
-                    # Combine contexts, prioritizing the enhanced retrieval
                     combined_context = enhanced_context + "\n\n" + basic_context
                 else:
                     combined_context = basic_context
@@ -602,8 +652,22 @@ class ChatService:
                     GENERAL_QUERY_TEMPLATE.format(query=query, personal_context=combined_context), 
                     "general information"
                 )
-            
-            # Check if it's asking for an email draft
+                print(response_text)
+                # if "I couldn't find" in response_text or "not recognized" in response_text:
+                #     web_search_results = self.perform_web_search(query)
+                #     if web_search_results:
+                #         # Summarize the web search results
+                #         summary = self.summarize_web_results(web_search_results)
+                #         response = {
+                #             "response": summary,
+                #             "links": []
+                #         }
+                #     else:
+                #         response = {
+                #             "response": "I apologize, but I couldn't find any relevant information.",
+                #             "links": []
+                #         }
+
             if 'email' in query.lower() and ('write' in query.lower() or 'draft' in query.lower() or 'create' in query.lower()):
                 # Create a JSON response with no links for email drafts
                 response = {
@@ -723,8 +787,8 @@ class ChatService:
         filename = f"conversation_{dominant_topic}_{timestamp}.txt"
         filepath = os.path.join(logs_dir, filename)
 
-        # Write the conversation history to the file
-        with open(filepath, "w") as file:
+        # Write the conversation history to the file with utf-8 encoding
+        with open(filepath, "w", encoding='utf-8') as file:
             for message in self.chat_history:
                 role = "User" if isinstance(message, HumanMessage) else "AI"
                 file.write(f"{role}: {message.content}\n")
@@ -870,6 +934,17 @@ class ChatService:
 
         # Proceed with normal intent-based routing for other queries
         intent = self.detect_intent(query)
+
+        if self.is_planning_request(query):
+            response_text = self._generate_detailed_plan(query)
+            response = {
+                "response": response_text,
+                "links": []
+            }
+            self.chat_history.append(HumanMessage(content=query))
+            self.chat_history.append(AIMessage(content=response_text))
+            tokens = len(query.split()) + len(response_text.split()) * 1.5
+            return response, int(tokens)
         
         if intent == QueryIntent.COMPANY:
             return self.handle_company_query(query)
@@ -877,3 +952,9 @@ class ChatService:
             return self.handle_identity_query(query)
         else:
             return self.handle_general_query(query)
+        
+    def is_planning_request(self, query: str) -> bool:
+        """Determine if the query is a request for planning or guidance"""
+        # Define keywords or phrases that indicate a planning request
+        planning_keywords = ["plan", "how to", "steps to", "guide", "help me", "I want to", "suggest", "advise"]
+        return any(keyword in query.lower() for keyword in planning_keywords)

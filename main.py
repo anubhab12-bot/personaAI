@@ -64,7 +64,7 @@ def chatbot():
             intent = chat_service.detect_intent(user_query)
             chat_service.intents.append(intent)
 
-            if user_query.lower() == "Bye":
+            if user_query.lower() == "quit":
                 print("\nSaving learned data and exiting...")
                 chat_service.save_intent_examples()
                 chat_service.save_conversation_history()
@@ -105,6 +105,7 @@ def chatbot():
                     elif "url" in link:
                         print(f"• {link['url']}")
 
+            # return response_data["response"]
             # Print usage stats in a more subtle way
             print(f"\n[Tokens: {used_tokens} | Remaining: {MAX_TOKENS_PER_DAY - total_used_tokens}]")
             
