@@ -49,6 +49,8 @@ FAISS: A library for efficient similarity search and clustering of dense vectors
 Python: The primary programming language used to implement the chatbot's logic and integrate various components.
 Summary
 PersonaAI is a sophisticated AI chatbot that combines advanced NLP techniques, dynamic intent detection, and a personalized knowledge base to deliver intelligent and contextually relevant interactions. It continuously learns from user interactions to enhance its performance and provide a more personalized experience.
+5. Task and Plan generator:
+Do you want to travel some where? or planning for start a business but you have lack of source to gather knowledge about that. No tension you can ask your PersonaAI it will provide you a blueprint according to your Plan. 
 
 
 MORE TO COME : 
