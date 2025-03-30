@@ -639,7 +639,7 @@ class ChatService:
                     response_text = self.general_chain.invoke(query)
                 except Exception as e:
                     print(f"Error using general chain: {e}. Falling back to direct response.")
-                    # Fallback to direct context retrieval
+
                     from prompts_folder.prompts import GENERAL_QUERY_TEMPLATE
                     response_text = self._get_direct_response(
                         query, 
@@ -654,20 +654,7 @@ class ChatService:
                     "general information"
                 )
                 print(response_text)
-                # if "I couldn't find" in response_text or "not recognized" in response_text:
-                #     web_search_results = self.perform_web_search(query)
-                #     if web_search_results:
-                #         # Summarize the web search results
-                #         summary = self.summarize_web_results(web_search_results)
-                #         response = {
-                #             "response": summary,
-                #             "links": []
-                #         }
-                #     else:
-                #         response = {
-                #             "response": "I apologize, but I couldn't find any relevant information.",
-                #             "links": []
-                #         }
+
 
             if 'email' in query.lower() and ('write' in query.lower() or 'draft' in query.lower() or 'create' in query.lower()):
                 # Create a JSON response with no links for email drafts
@@ -733,7 +720,7 @@ class ChatService:
         ]
         
         response = self.llm.invoke(messages)
-        print(response.content)
+        # print(response.content)
         return response.content
     
     def get_relevant_context(self, query, category=None, top_k=5):

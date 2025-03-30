@@ -12,6 +12,16 @@ from service.settings import (
 from service.personal_knowledge import PersonalKnowledgeBase
 from service.chat_service import ChatService
 from service.tts import TextToSpeech
+import webbrowser
+import re
+from transformers import pipeline
+
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+def is_negative_response(response_text):
+    labels = ["negative response", "positive response"]
+    result = classifier(response_text, labels)
+    return result["labels"][0] == "negative response"
 
 def read_personal_data():
     """Read personal data from JSON file"""
@@ -98,7 +108,16 @@ def chatbot():
                             return "Error: The email address provided is not valid. Please enter a valid email address."
                         subject = input("\nEnter the subject of the email: ")
                         body = last_response_text
-                        send_email( subject, body, recipient_email)
+
+                        document_path = input("\nPlease provide the path to the PDF document you want to attach: ")
+                        document_path = document_path.strip()  # Remove any leading/trailing whitespace
+
+                        # Check if the document path is valid
+                        if document_path and not os.path.isfile(document_path):
+                            document_path = None
+                            print("Error: The provided document path is not valid or the file does not exist.")
+                            continue
+                        send_email( subject, body, recipient_email, document_path)
                         continue 
                 
             if total_requests >= MAX_REQUESTS_PER_DAY:
@@ -117,6 +136,8 @@ def chatbot():
                 time.sleep(60 - (time.time() - minute_start_time))
                 tokens_used_in_minute = 0
 
+            url_pattern =  r"\(?(https://[^\s\)]+)\)?"
+            
             response_data, used_tokens = chat_service.chat(user_query)
             response_data["Tasks_doc"] = chat_service.save_topic_wise_conversation_history()
             last_response_text = response_data["response"]
@@ -125,6 +146,12 @@ def chatbot():
             total_requests += 1
             total_used_tokens += used_tokens
             tokens_used_in_minute += used_tokens
+
+            urls = re.findall(url_pattern, response_data["response"])
+
+            for url in urls:
+                print(f"Opening: {url}")
+                webbrowser.open(url)
 
             print("\nPersonaAI:")
             print("Response : ", response_data["response"])
