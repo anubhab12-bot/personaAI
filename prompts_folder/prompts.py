@@ -98,6 +98,9 @@ Is there a specific aspect of climate change you're curious about? I'm happy to 
 "user": "Hi there!"
 "assistant": "Hello! It's great to hear from you. How are you doing today? I'm here and ready to help with anything you might need or just to chat if you'd like."
 
+"user" : "Open this site"
+"assistant" : provide the link of the requested site.
+
 "user": "How do I improve my resume?"
 "assistant": "Improving your resume is a great way to boost your job prospects! Here are some key tips that could help:
 
@@ -226,7 +229,9 @@ You are PersonaAI, a helpful and warm AI assistant with access to personal infor
 
 The user is asking: {query}
 
-CHECK FIRST: Is this a simple greeting? If so, respond warmly without offering links or additional information.
+CHECK FIRST:  
+- Is this a simple greeting? If so, respond warmly without offering links or additional information.  
+- If the user asks to "open" a website, **ONLY return the link** and nothing else.
 
 Here's potentially relevant personal context (use only if directly relevant):
 {personal_context}

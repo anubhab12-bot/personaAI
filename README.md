@@ -56,3 +56,10 @@ Do you want to travel some where? or planning for start a business but you have 
 MORE TO COME : 
 
 Will added more functionalities here it is just a start of my project and not a big huge level things just a basic but core starting will be added some more features. Thank you.
+
+
+SO HERE IS THE NEW UPDATE:
+
+As my model is only stored the data till 2023, so it was not able to provide data of recent questions. Now it can answer recent things also, searching on Web automatically.
+
+USING LANGCHAINS GoogleSearchAPIWrapper

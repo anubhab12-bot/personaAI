@@ -3,6 +3,7 @@ import json
 import os
 import traceback
 from prompts_folder.prompts import *
+from service.check import EnhancedGoogleSearch
 from service.send_mail import is_valid_email, send_email
 from service.settings import (
     MAX_REQUESTS_PER_DAY, 
@@ -11,12 +12,19 @@ from service.settings import (
 )
 from service.personal_knowledge import PersonalKnowledgeBase
 from service.chat_service import ChatService
+from service.taskautomation import  process_with_groq, search_google
 from service.tts import TextToSpeech
 import webbrowser
 import re
 from transformers import pipeline
+from langchain_community.utilities import SearxSearchWrapper
 
+from service.utils import fetch_duckduckgo_links
+
+s = SearxSearchWrapper(searx_host="http://localhost:8888")
 classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+search_tool = EnhancedGoogleSearch()
 
 def is_negative_response(response_text):
     labels = ["negative response", "positive response"]
@@ -142,6 +150,20 @@ def chatbot():
             response_data["Tasks_doc"] = chat_service.save_topic_wise_conversation_history()
             last_response_text = response_data["response"]
             print(last_response_text)
+
+            if is_negative_response(last_response_text):
+                print("Let me search for information about that...")
+                search = search_google(user_query)
+                web_response = process_with_groq(user_query, search)
+                
+                if web_response:
+                    print("\nBased on my research:")
+                    print(web_response)
+                    last_response_text = web_response
+                else:
+                    print("I apologize, but I couldn't find reliable information to answer your question.")
+                
+                continue
 
             total_requests += 1
             total_used_tokens += used_tokens
