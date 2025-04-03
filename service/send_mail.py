@@ -6,6 +6,8 @@ import os
 from dotenv import load_dotenv
 from email.mime.application import MIMEApplication
 
+from service.image import upload_image
+
 
 load_dotenv()
 
@@ -14,12 +16,20 @@ def is_valid_email(email):
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(email_regex, email) is not None
 
-def send_email(subject, body, to_email, document_path=None):
+def send_email(subject, body, to_email, document_path=None, banner_url = None):
     sender_email = os.getenv("MAIL")
     sender_password = os.getenv("APP_PASSWORD")
 
     # Banner image (hosted on Cloudinary)
-    banner_url = "https://res.cloudinary.com/darid8ehu/image/upload/v1743309369/uwclev5dfhegnjsxjjbn.png"
+    if banner_url and os.path.exists(banner_url):
+        cloudinary_url = upload_image(banner_url)
+        if cloudinary_url:
+            banner_url = cloudinary_url
+        else:
+            print("Failed to upload banner, using default URL")
+            banner_url = "https://res.cloudinary.com/darid8ehu/image/upload/v1743309369/uwclev5dfhegnjsxjjbn.png"
+    elif not banner_url:
+        banner_url = "https://res.cloudinary.com/darid8ehu/image/upload/v1743309369/uwclev5dfhegnjsxjjbn.png"
 
     # Card-style email body with banner header
     formatted_body = f"""
